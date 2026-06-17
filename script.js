@@ -1,6 +1,14 @@
 const checklistEl = document.getElementById('checklist');
 let rows = [];
 
+const ROWS_STORAGE_KEY = 'medocChecklistRows';
+const STATE_STORAGE_KEY = 'medocChecklistState';
+const DEFAULT_ROWS = [
+  { id: 'task-1', label: 'Morning habit', durationHours: 6 },
+  { id: 'task-2', label: 'Afternoon check', durationHours: 8 },
+  { id: 'task-3', label: 'Evening reminder', durationHours: 2 },
+];
+
 function formatTimestamp(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -17,79 +25,92 @@ function getExpiryDate(timestamp, durationHours) {
   return saved;
 }
 
-async function loadRows() {
+// Local storage functions
+function loadRowsFromStorage() {
   try {
-    const response = await fetch('/api/rows');
-    if (!response.ok) return [];
-    return await response.json();
+    const raw = localStorage.getItem(ROWS_STORAGE_KEY);
+    if (!raw) return DEFAULT_ROWS;
+    return JSON.parse(raw);
   } catch (error) {
-    console.warn('Failed to load rows from server', error);
-    return [];
+    console.warn('Failed to load rows from localStorage', error);
+    return DEFAULT_ROWS;
   }
 }
 
-async function loadState() {
+function saveRowsToStorage(rows) {
+  localStorage.setItem(ROWS_STORAGE_KEY, JSON.stringify(rows));
+}
+
+function loadStateFromStorage() {
   try {
-    const response = await fetch('/api/state');
-    if (!response.ok) return {};
-    return await response.json();
+    const raw = localStorage.getItem(STATE_STORAGE_KEY);
+    return JSON.parse(raw || '{}');
   } catch (error) {
-    console.warn('Failed to load state from server', error);
+    console.warn('Failed to load state from localStorage', error);
     return {};
   }
 }
 
+function saveStateToStorage(state) {
+  localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+}
+
+// Primary load functions using localStorage
+async function loadRows() {
+  return loadRowsFromStorage();
+}
+
+async function loadState() {
+  return loadStateFromStorage();
+}
+
 async function addNewRow() {
-  try {
-    const response = await fetch('/api/rows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: 'New task', durationHours: 6 }),
-    });
-    if (response.ok) {
-      render();
-    }
-  } catch (error) {
-    console.warn('Failed to add new row', error);
-  }
+  const rows = loadRowsFromStorage();
+  const newRow = {
+    id: `task-${Date.now()}`,
+    label: 'New task',
+    durationHours: 6,
+  };
+  rows.push(newRow);
+  saveRowsToStorage(rows);
+  render();
 }
 
 async function updateRowLabel(rowId, newLabel) {
-  try {
-    await fetch(`/api/rows/${rowId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newLabel }),
-    });
-  } catch (error) {
-    console.warn('Failed to update row label', error);
+  const rows = loadRowsFromStorage();
+  const row = rows.find((r) => r.id === rowId);
+  if (row) {
+    row.label = newLabel;
+    saveRowsToStorage(rows);
+  }
+}
+
+async function updateRowDuration(rowId, durationHours) {
+  const rows = loadRowsFromStorage();
+  const row = rows.find((r) => r.id === rowId);
+  if (row) {
+    row.durationHours = durationHours;
+    saveRowsToStorage(rows);
   }
 }
 
 async function deleteRow(rowId) {
-  try {
-    await fetch(`/api/rows/${rowId}`, { method: 'DELETE' });
-    render();
-  } catch (error) {
-    console.warn('Failed to delete row', error);
+  const rows = loadRowsFromStorage();
+  const index = rows.findIndex((r) => r.id === rowId);
+  if (index !== -1) {
+    rows.splice(index, 1);
+    saveRowsToStorage(rows);
   }
 }
 
 async function updateRowState(rowId, savedAt, durationHours) {
-  try {
-    const body = { id: rowId };
-    if (savedAt) {
-      body.savedAt = savedAt;
-      body.durationHours = durationHours;
-    }
-    await fetch('/api/state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    console.warn('Failed to update row state on server', error);
+  const state = loadStateFromStorage();
+  if (savedAt) {
+    state[rowId] = { savedAt, durationHours };
+  } else {
+    delete state[rowId];
   }
+  saveStateToStorage(state);
 }
 
 function buildRow(row, state) {
@@ -186,6 +207,8 @@ function buildRow(row, state) {
       } else {
         await updateRowState(row.id, currentSavedAt, durationValue);
       }
+    } else {
+      await updateRowDuration(row.id, durationValue);
     }
   });
 

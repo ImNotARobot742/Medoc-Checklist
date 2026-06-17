@@ -28,7 +28,9 @@ npm start
 ```
 3. Open `http://localhost:8080`.
 
-## GitHub Pages
-This project can be hosted as a static site on GitHub Pages, but the current implementation uses a server API for persistence. If you want pure GitHub Pages hosting, the app should be refactored to use browser-only storage instead of `/api/state`.
+## Storage
+Data persists in your **browser's localStorage** and survives page reloads and browser restarts. No account needed. Works offline and on GitHub Pages!
+
+Rows, labels, timestamps, and all state are stored locally in your browser.
 
 > Note: The server saves each checked timestamp and selected expiration duration.
