@@ -272,6 +272,7 @@ function buildRow(row, state) {
   durationInput.type = 'number';
   durationInput.min = '1';
   durationInput.step = '1';
+  // Use duration from saved state when present so changes persist in the UI
   durationInput.value = row.durationHours;
   durationInput.dataset.rowId = row.id;
   durationInput.title = 'Expiration duration in hours';
@@ -288,6 +289,8 @@ function buildRow(row, state) {
   let currentSavedAt = savedRow.savedAt || null;
   const savedAt = currentSavedAt ? new Date(currentSavedAt) : null;
   const durationHours = savedRow.durationHours ?? row.durationHours;
+  // reflect the effective duration (state or row) in the input so it's preserved across sessions
+  durationInput.value = durationHours;
 
   const expiry = getExpiryDate(savedAt, durationHours);
   const now = new Date();
