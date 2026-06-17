@@ -9,6 +9,46 @@ const DEFAULT_ROWS = [
   { id: 'task-3', label: 'Evening reminder', durationHours: 2 },
 ];
 
+// Notification preference key
+const NOTIF_PREF_KEY = 'medocChecklistNotificationsEnabled';
+
+function loadNotifPref() {
+  try {
+    return localStorage.getItem(NOTIF_PREF_KEY) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveNotifPref(enabled) {
+  try {
+    localStorage.setItem(NOTIF_PREF_KEY, enabled ? 'true' : 'false');
+  } catch (e) {}
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  try {
+    const perm = await Notification.requestPermission();
+    return perm === 'granted';
+  } catch (e) {
+    return false;
+  }
+}
+
+function showNotification(title, body) {
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    new Notification(title, { body });
+    if (navigator.vibrate) navigator.vibrate(200);
+  } catch (e) {
+    console.warn('Notification failed', e);
+  }
+}
+
 function formatTimestamp(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -106,10 +146,31 @@ async function deleteRow(rowId) {
 async function updateRowState(rowId, savedAt, durationHours) {
   const state = loadStateFromStorage();
   if (savedAt) {
-    state[rowId] = { savedAt, durationHours };
+    // reset notified flag when a row is (re)checked
+    state[rowId] = { savedAt, durationHours, notified: false };
   } else {
     delete state[rowId];
   }
+  saveStateToStorage(state);
+}
+
+// Check for expired timers and notify if needed
+function checkNotifications(state, rows) {
+  const enabled = loadNotifPref();
+  if (!enabled) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const now = new Date();
+  rows.forEach((row) => {
+    const s = state[row.id];
+    if (!s || !s.savedAt) return;
+    if (s.notified) return;
+    const expiry = getExpiryDate(new Date(s.savedAt), s.durationHours ?? row.durationHours);
+    if (expiry && expiry <= now) {
+      showNotification('Timer expired', `${row.label} timer ended`);
+      s.notified = true;
+    }
+  });
   saveStateToStorage(state);
 }
 
@@ -243,6 +304,29 @@ async function render() {
   addRowBtn.textContent = '+ Add row';
   addRowBtn.addEventListener('click', addNewRow);
   checklistEl.append(addRowBtn);
+
+  // initialize notification toggle UI and behavior
+  const notifCheckbox = document.getElementById('notif-toggle-checkbox');
+  if (notifCheckbox) {
+    notifCheckbox.checked = loadNotifPref();
+    notifCheckbox.onchange = async () => {
+      const enabled = notifCheckbox.checked;
+      saveNotifPref(enabled);
+      if (enabled) {
+        const ok = await requestNotificationPermission();
+        if (!ok) {
+          // user denied; reflect in UI
+          notifCheckbox.checked = false;
+          saveNotifPref(false);
+        }
+      }
+    };
+  }
+
+  // Check notifications after render
+  try {
+    checkNotifications(state, rows);
+  } catch (e) {}
 }
 
 render();

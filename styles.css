@@ -24,6 +24,24 @@ header {
   margin-bottom: 18px;
 }
 
+.notif-toggle {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.notif-toggle label {
+  font-size: 0.95rem;
+  color: #4f4f56;
+}
+
+.notif-toggle input[type="checkbox"] {
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
 h1 {
   margin: 0 0 8px;
   font-size: 1.55rem;
