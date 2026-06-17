@@ -343,6 +343,32 @@ function buildRow(row, state) {
     }
   });
 
+  // Save duration changes proactively on input (debounced) and on blur to handle mobile behavior
+  let durationSaveTimer = null;
+  async function saveDurationChange() {
+    const durationValue = Number(durationInput.value) || row.durationHours;
+    if (currentSavedAt) {
+      const expiryDate = getExpiryDate(new Date(currentSavedAt), durationValue);
+      if (!expiryDate || expiryDate <= new Date()) {
+        checkbox.checked = false;
+        currentSavedAt = null;
+        timestampEl.textContent = 'No timestamp';
+        timestampEl.classList.add('empty');
+        await updateRowState(row.id, null);
+      } else {
+        await updateRowState(row.id, currentSavedAt, durationValue);
+      }
+    } else {
+      await updateRowDuration(row.id, durationValue);
+    }
+  }
+
+  durationInput.addEventListener('input', () => {
+    if (durationSaveTimer) clearTimeout(durationSaveTimer);
+    durationSaveTimer = setTimeout(() => { saveDurationChange(); durationSaveTimer = null; }, 700);
+  });
+  durationInput.addEventListener('blur', async () => { if (durationSaveTimer) { clearTimeout(durationSaveTimer); durationSaveTimer = null; } await saveDurationChange(); });
+
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-btn';
   deleteBtn.textContent = '✕';
