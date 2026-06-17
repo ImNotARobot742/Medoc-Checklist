@@ -1,11 +1,11 @@
 const CACHE_NAME = 'medoc-checklist-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/script.js',
-  '/manifest.json',
-  '/icon.svg'
+  './',
+  'index.html',
+  'styles.css',
+  'script.js',
+  'manifest.json',
+  'icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,13 +29,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
-  event.respondWith(
+    event.respondWith(
     caches.match(req).then((cached) => cached || fetch(req).then((res) => {
       return caches.open(CACHE_NAME).then((cache) => {
         try { cache.put(req, res.clone()); } catch (e) {}
         return res;
       });
-    })).catch(() => caches.match('/index.html'))
+    })).catch(() => caches.match('index.html'))
   );
 });
 
@@ -49,10 +49,10 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(
+    event.waitUntil(
     clients.matchAll({ type: 'window' }).then((c) => {
       if (c.length > 0) return c[0].focus();
-      return clients.openWindow('/');
+      return clients.openWindow('./');
     })
   );
 });

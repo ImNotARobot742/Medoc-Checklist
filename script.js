@@ -402,6 +402,16 @@ setInterval(render, 30_000);
 
 // Register service worker for PWA (offline caching & notification support)
 if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./service-worker.js');
+      console.log('ServiceWorker registered', reg.scope);
+    } catch (e) {
+      console.warn('ServiceWorker registration failed', e);
+    }
+  });
+}
+if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').then((reg) => {
     // registration successful
   }).catch((err) => {
