@@ -1,12 +1,14 @@
-# Mobile Checklist
+# Medoc Checklist
 
-A minimal mobile-friendly checklist web app with 3 rows.
+A mobile-friendly checklist web app with dynamic editable rows.
 Each row has:
-- a checkbox
-- a configurable duration in hours
+- an **editable label** (click to edit)
+- a checkbox to mark as done
+- a configurable expiration duration in hours
 - a saved timestamp shown when checked
+- a delete button (✕) to remove the row
 
-The checkbox stays checked until the configured duration expires, then it resets. State is stored on the server and saved in `data.json`.
+**Add new rows** with the "+ Add row" button at the bottom. The checkbox stays checked until the configured duration expires, then it resets automatically. All rows, labels, timestamps, and state persist on the server and are stored in JSON files.
 
 ## Files
 - `index.html` — page markup
@@ -14,20 +16,8 @@ The checkbox stays checked until the configured duration expires, then it resets
 - `script.js` — checkbox logic and server-backed persistence
 - `server.js` — simple Express server and storage API
 - `package.json` — Node app dependencies and start script
-- `Dockerfile` — builds and runs the Node server
 
-## Run locally with Docker
-1. Build the image:
-   ```powershell
-docker build -t medoc-checklist .
-```
-2. Run the container:
-   ```powershell
-docker run --rm -p 8080:80 medoc-checklist
-```
-3. Open `http://localhost:8080`.
-
-## Run locally without Docker
+## Run locally
 1. Install dependencies:
    ```powershell
 npm install
@@ -37,5 +27,8 @@ npm install
 npm start
 ```
 3. Open `http://localhost:8080`.
+
+## GitHub Pages
+This project can be hosted as a static site on GitHub Pages, but the current implementation uses a server API for persistence. If you want pure GitHub Pages hosting, the app should be refactored to use browser-only storage instead of `/api/state`.
 
 > Note: The server saves each checked timestamp and selected expiration duration.

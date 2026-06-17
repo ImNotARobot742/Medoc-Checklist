@@ -1,9 +1,5 @@
-const DEFAULT_ROWS = [
-  { id: 'task-1', label: 'Morning habit', durationHours: 6 },
-  { id: 'task-2', label: 'Afternoon check', durationHours: 8 },
-  { id: 'task-3', label: 'Evening reminder', durationHours: 2 },
-];
 const checklistEl = document.getElementById('checklist');
+let rows = [];
 
 function formatTimestamp(date) {
   const year = date.getFullYear();
@@ -21,6 +17,17 @@ function getExpiryDate(timestamp, durationHours) {
   return saved;
 }
 
+async function loadRows() {
+  try {
+    const response = await fetch('/api/rows');
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.warn('Failed to load rows from server', error);
+    return [];
+  }
+}
+
 async function loadState() {
   try {
     const response = await fetch('/api/state');
@@ -29,6 +36,42 @@ async function loadState() {
   } catch (error) {
     console.warn('Failed to load state from server', error);
     return {};
+  }
+}
+
+async function addNewRow() {
+  try {
+    const response = await fetch('/api/rows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'New task', durationHours: 6 }),
+    });
+    if (response.ok) {
+      render();
+    }
+  } catch (error) {
+    console.warn('Failed to add new row', error);
+  }
+}
+
+async function updateRowLabel(rowId, newLabel) {
+  try {
+    await fetch(`/api/rows/${rowId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newLabel }),
+    });
+  } catch (error) {
+    console.warn('Failed to update row label', error);
+  }
+}
+
+async function deleteRow(rowId) {
+  try {
+    await fetch(`/api/rows/${rowId}`, { method: 'DELETE' });
+    render();
+  } catch (error) {
+    console.warn('Failed to delete row', error);
   }
 }
 
@@ -58,9 +101,23 @@ function buildRow(row, state) {
   checkbox.id = `${row.id}-checkbox`;
   checkbox.dataset.rowId = row.id;
 
-  const label = document.createElement('label');
-  label.htmlFor = checkbox.id;
+  const label = document.createElement('span');
+  label.className = 'row-label';
   label.textContent = row.label;
+  label.contentEditable = true;
+  label.spellcheck = false;
+  label.addEventListener('blur', async () => {
+    const newLabel = label.textContent.trim() || row.label;
+    if (newLabel !== row.label) {
+      label.textContent = newLabel;
+      await updateRowLabel(row.id, newLabel);
+    }
+  });
+  label.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      label.blur();
+    }
+  });
 
   const durationControl = document.createElement('div');
   durationControl.className = 'duration-control';
@@ -132,20 +189,37 @@ function buildRow(row, state) {
     }
   });
 
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '✕';
+  deleteBtn.title = 'Delete row';
+  deleteBtn.addEventListener('click', async () => {
+    if (confirm('Delete this row?')) {
+      await deleteRow(row.id);
+    }
+  });
+
   const leftGroup = document.createElement('div');
   leftGroup.className = 'checkbox-wrap';
-  leftGroup.append(checkbox, label);
+  leftGroup.append(checkbox, label, deleteBtn);
 
   rowEl.append(leftGroup, durationControl, timestampEl);
   return rowEl;
 }
 
 async function render() {
+  rows = await loadRows();
   const state = await loadState();
   checklistEl.innerHTML = '';
-  DEFAULT_ROWS.forEach((row) => {
+  rows.forEach((row) => {
     checklistEl.append(buildRow(row, state));
   });
+
+  const addRowBtn = document.createElement('button');
+  addRowBtn.className = 'add-row-btn';
+  addRowBtn.textContent = '+ Add row';
+  addRowBtn.addEventListener('click', addNewRow);
+  checklistEl.append(addRowBtn);
 }
 
 render();
