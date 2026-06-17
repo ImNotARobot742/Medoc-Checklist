@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medoc-checklist-v1';
+const CACHE_NAME = 'medoc-checklist-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -29,7 +29,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  const pathname = url.pathname || '';
+
+  // Use network-first for main assets so the latest app logic runs and localStorage behavior is current.
+  const networkFirstAssets = ['/', '/index.html', 'index.html', '/script.js', 'script.js', '/manifest.json', 'manifest.json'];
+
+  if (networkFirstAssets.includes(pathname) || networkFirstAssets.includes(req.url)) {
     event.respondWith(
+      fetch(req).then((res) => {
+        // update cache with fresh response
+        caches.open(CACHE_NAME).then((cache) => {
+          try { cache.put(req, res.clone()); } catch (e) {}
+        });
+        return res;
+      }).catch(() => caches.match(req).then((cached) => cached || caches.match('index.html')))
+    );
+    return;
+  }
+
+  // For other assets, prefer cache first for offline availability
+  event.respondWith(
     caches.match(req).then((cached) => cached || fetch(req).then((res) => {
       return caches.open(CACHE_NAME).then((cache) => {
         try { cache.put(req, res.clone()); } catch (e) {}
