@@ -42,6 +42,27 @@ function showNotification(title, body) {
   try {
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
+    // Prefer service worker registration for notifications (better background behavior)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
+      try {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg && reg.showNotification) {
+            reg.showNotification(title, { body });
+            if (navigator.vibrate) navigator.vibrate(200);
+            return;
+          }
+          // fallback
+          new Notification(title, { body });
+          if (navigator.vibrate) navigator.vibrate(200);
+        }).catch(() => {
+          new Notification(title, { body });
+          if (navigator.vibrate) navigator.vibrate(200);
+        });
+        return;
+      } catch (e) {
+        // fall through to page notification
+      }
+    }
     new Notification(title, { body });
     if (navigator.vibrate) navigator.vibrate(200);
   } catch (e) {
@@ -331,3 +352,12 @@ async function render() {
 
 render();
 setInterval(render, 30_000);
+
+// Register service worker for PWA (offline caching & notification support)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').then((reg) => {
+    // registration successful
+  }).catch((err) => {
+    console.warn('Service worker registration failed:', err);
+  });
+}
