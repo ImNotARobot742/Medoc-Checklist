@@ -205,6 +205,8 @@ async function deleteRow(rowId) {
   if (index !== -1) {
     rows.splice(index, 1);
     saveRowsToStorage(rows);
+    // update the UI immediately after deleting
+    try { await render(); } catch (e) {}
   }
 }
 
