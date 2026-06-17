@@ -1,3 +1,7 @@
-FROM nginx:stable-alpine
-COPY . /usr/share/nginx/html
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json ./
+RUN npm install --production
+COPY . ./
 EXPOSE 80
+CMD ["npm", "start"]

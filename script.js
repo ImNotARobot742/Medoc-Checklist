@@ -1,8 +1,7 @@
-const STORAGE_KEY = 'mobileChecklistState';
 const DEFAULT_ROWS = [
-  { id: 'task-1', label: 'Row 1: Morning habit', durationHours: 6 },
-  { id: 'task-2', label: 'Row 2: Afternoon check', durationHours: 8 },
-  { id: 'task-3', label: 'Row 3: Evening reminder', durationHours: 2 },
+  { id: 'task-1', label: 'Morning habit', durationHours: 6 },
+  { id: 'task-2', label: 'Afternoon check', durationHours: 8 },
+  { id: 'task-3', label: 'Evening reminder', durationHours: 2 },
 ];
 const checklistEl = document.getElementById('checklist');
 
@@ -15,26 +14,39 @@ function formatTimestamp(date) {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn('Failed to parse checklist state', error);
-    return {};
-  }
-}
-
-function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
 function getExpiryDate(timestamp, durationHours) {
   if (!timestamp) return null;
   const saved = new Date(timestamp);
   saved.setHours(saved.getHours() + Number(durationHours));
   return saved;
+}
+
+async function loadState() {
+  try {
+    const response = await fetch('/api/state');
+    if (!response.ok) return {};
+    return await response.json();
+  } catch (error) {
+    console.warn('Failed to load state from server', error);
+    return {};
+  }
+}
+
+async function updateRowState(rowId, savedAt, durationHours) {
+  try {
+    const body = { id: rowId };
+    if (savedAt) {
+      body.savedAt = savedAt;
+      body.durationHours = durationHours;
+    }
+    await fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    console.warn('Failed to update row state on server', error);
+  }
 }
 
 function buildRow(row, state) {
@@ -69,7 +81,8 @@ function buildRow(row, state) {
   timestampEl.dataset.rowId = row.id;
 
   const savedRow = state[row.id] || {};
-  const savedAt = savedRow.savedAt ? new Date(savedRow.savedAt) : null;
+  let currentSavedAt = savedRow.savedAt || null;
+  const savedAt = currentSavedAt ? new Date(currentSavedAt) : null;
   const durationHours = savedRow.durationHours ?? row.durationHours;
 
   const expiry = getExpiryDate(savedAt, durationHours);
@@ -83,66 +96,56 @@ function buildRow(row, state) {
   } else if (savedAt) {
     timestampEl.textContent = formatTimestamp(savedAt);
     timestampEl.classList.remove('empty');
-    checkbox.checked = false;
-    delete state[row.id];
   } else {
     timestampEl.textContent = 'No timestamp';
   }
 
-  checkbox.addEventListener('change', () => {
+  checkbox.addEventListener('change', async () => {
     const durationValue = Number(durationInput.value) || row.durationHours;
     if (checkbox.checked) {
       const nowDate = new Date();
-      state[row.id] = {
-        savedAt: nowDate.toISOString(),
-        durationHours: durationValue,
-      };
+      currentSavedAt = nowDate.toISOString();
       timestampEl.textContent = formatTimestamp(nowDate);
       timestampEl.classList.remove('empty');
+      await updateRowState(row.id, currentSavedAt, durationValue);
     } else {
-      delete state[row.id];
+      currentSavedAt = null;
       timestampEl.textContent = 'No timestamp';
       timestampEl.classList.add('empty');
+      await updateRowState(row.id, null);
     }
-    saveState(state);
   });
 
-  durationInput.addEventListener('change', () => {
+  durationInput.addEventListener('change', async () => {
     const durationValue = Number(durationInput.value) || row.durationHours;
-    const existing = state[row.id];
-    if (existing && existing.savedAt) {
-      state[row.id] = {
-        savedAt: existing.savedAt,
-        durationHours: durationValue,
-      };
-      const expiryDate = getExpiryDate(new Date(existing.savedAt), durationValue);
+    if (currentSavedAt) {
+      const expiryDate = getExpiryDate(new Date(currentSavedAt), durationValue);
       if (!expiryDate || expiryDate <= new Date()) {
         checkbox.checked = false;
-        delete state[row.id];
+        currentSavedAt = null;
         timestampEl.textContent = 'No timestamp';
         timestampEl.classList.add('empty');
+        await updateRowState(row.id, null);
+      } else {
+        await updateRowState(row.id, currentSavedAt, durationValue);
       }
-      saveState(state);
     }
   });
 
   const leftGroup = document.createElement('div');
-  leftGroup.style.display = 'flex';
-  leftGroup.style.alignItems = 'center';
-  leftGroup.style.gap = '10px';
+  leftGroup.className = 'checkbox-wrap';
   leftGroup.append(checkbox, label);
 
   rowEl.append(leftGroup, durationControl, timestampEl);
   return rowEl;
 }
 
-function render() {
-  const state = loadState();
+async function render() {
+  const state = await loadState();
   checklistEl.innerHTML = '';
   DEFAULT_ROWS.forEach((row) => {
     checklistEl.append(buildRow(row, state));
   });
-  saveState(state);
 }
 
 render();
