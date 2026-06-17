@@ -42,6 +42,24 @@ header {
   cursor: pointer;
 }
 
+.install-wrap {
+  margin-top: 10px;
+}
+
+.install-btn {
+  display: none; /* shown only when browser fires beforeinstallprompt */
+  appearance: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #0a84ff;
+  background: #0a84ff;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.install-btn:hover { background: #0066f0; }
+
 h1 {
   margin: 0 0 8px;
   font-size: 1.55rem;

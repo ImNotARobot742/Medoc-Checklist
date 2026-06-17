@@ -11,6 +11,7 @@ const DEFAULT_ROWS = [
 
 // Notification preference key
 const NOTIF_PREF_KEY = 'medocChecklistNotificationsEnabled';
+const INSTALLED_KEY = 'medocChecklistInstalled';
 
 function loadNotifPref() {
   try {
@@ -69,6 +70,49 @@ function showNotification(title, body) {
     console.warn('Notification failed', e);
   }
 }
+
+function loadInstalledFlag() {
+  try { return localStorage.getItem(INSTALLED_KEY) === 'true'; } catch (e) { return false; }
+}
+function saveInstalledFlag(v) { try { localStorage.setItem(INSTALLED_KEY, v ? 'true' : 'false'); } catch (e) {} }
+
+// PWA install prompt handling
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('install-btn');
+  if (btn && !loadInstalledFlag()) {
+    btn.style.display = 'inline-block';
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  saveInstalledFlag(true);
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'none';
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const installBtn = document.getElementById('install-btn');
+  if (installBtn) {
+    if (loadInstalledFlag()) installBtn.style.display = 'none';
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      try {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          saveInstalledFlag(true);
+          installBtn.style.display = 'none';
+        }
+      } catch (e) {
+        console.warn('Install prompt failed', e);
+      }
+      deferredInstallPrompt = null;
+    });
+  }
+});
 
 function formatTimestamp(date) {
   const year = date.getFullYear();
